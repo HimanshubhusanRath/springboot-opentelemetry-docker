@@ -1,0 +1,14 @@
+#
+# NOTE:
+# No need of scrapping jobs as we are using OTLP exporter to send the metrics to Prometheus.
+# Prometheus doesn't need to pull the same data as we are already pushing that.
+#
+
+#global:
+#  evaluation_interval: 30s
+#  scrape_interval: 5s
+#scrape_configs:
+#  - job_name: otel-collector
+#    static_configs:
+#      - targets:
+#          - 'otelcol:8889'

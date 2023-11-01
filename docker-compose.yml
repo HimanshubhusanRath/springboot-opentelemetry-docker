@@ -1,0 +1,136 @@
+version: '3.9'
+# Define the networks
+networks:
+  default:
+    name: k8-services
+    driver: bridge
+
+# Define the services
+services:
+  svc-a:
+    image: himanshubhusan88/service-a:1.0
+    container_name: service-a
+    ports:
+      - "9094:9094"
+    deploy:
+      resources:
+        limits:
+          memory: 300M
+    restart: unless-stopped
+    depends_on:
+      svc-b:
+        condition: service_started
+    environment:
+      - SERVICE_B_HOST=service-b # Service-b container name
+      - SERVICE_B_PORT=9095
+      - OTEL_SERVICE_NAME=service-a # Service name = service-a
+      - OTEL_METRICS_EXPORTER=otlp
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otelcol:4317 # OTEL Collector endpoint
+
+  svc-b:
+    image: himanshubhusan88/service-b:1.0
+    container_name: service-b
+    ports:
+      - "9095:9095"
+    deploy:
+      resources:
+        limits:
+          memory: 300M
+    restart: unless-stopped
+    environment:
+      - OTEL_SERVICE_NAME=service-b # Service name = service-b
+      - OTEL_METRICS_EXPORTER=otlp
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otelcol:4317 # OTEL Collector endpoint
+
+  ##
+  ## TELEMETRY SERVICES
+  ##
+  # Telemetry - Prometheus
+  prometheus:
+    image: quay.io/prometheus/prometheus:v2.47.0
+    container_name: prometheus
+    command:
+      - --web.console.templates=/etc/prometheus/consoles
+      - --web.console.libraries=/etc/prometheus/console_libraries
+      - --storage.tsdb.retention.time=1h
+      - --config.file=/etc/prometheus/prometheus-config.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+      - --web.route-prefix=/
+      - --enable-feature=exemplar-storage
+      - --enable-feature=otlp-write-receiver
+    volumes:
+      - ./components/prometheus-config.yml:/etc/prometheus/prometheus-config.yml
+    deploy:
+      resources:
+        limits:
+          memory: 300M
+    ports:
+      - "${PROMETHEUS_SERVICE_PORT}:${PROMETHEUS_SERVICE_PORT}"
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:10.1.2
+    container_name: grafana
+    deploy:
+      resources:
+        limits:
+          memory: 100M
+    environment:
+      - "GF_INSTALL_PLUGINS=grafana-opensearch-datasource"
+    volumes:
+      - /Users/himanshubhusanrath/Desktop/grafana-temp/:/var/lib/grafana
+    ports:
+      - "3000:3000"
+
+  # Jaeger
+  jaeger:
+    image: jaegertracing/all-in-one:1.49
+    container_name: jaeger
+    command:
+      - "--memory.max-traces"
+      - "8000"
+      - "--query.base-path"
+      - "/jaeger/ui"
+      - "--prometheus.server-url"
+      - "http://${PROMETHEUS_ADDR}"
+      - "--prometheus.query.support-spanmetrics-connector=true"
+    deploy:
+      resources:
+        limits:
+          memory: 300M
+    restart: unless-stopped
+    ports:
+      - "16686:16686"         # Jaeger UI
+      - "4317"                # OTLP gRPC default port
+    depends_on:
+      prometheus:
+        condition: service_started
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - METRICS_STORAGE_TYPE=prometheus
+
+  # OpenTelemetry Collector
+  otelcol:
+    image: otel/opentelemetry-collector-contrib:0.86.0
+    container_name: otel-col
+    deploy:
+      resources:
+        limits:
+          memory: 125M
+    restart: unless-stopped
+    command: [ "--config=/etc/otelcol-config.yml" ]
+    volumes:
+      - ./components/otel-collector-config.yml:/etc/otelcol-config.yml
+    ports:
+      - "4317:4317"     # OTLP over gRPC receiver
+      - "4318:4318"     # OTLP over HTTP receiver
+    depends_on:
+      jaeger:
+        condition: service_started
+      prometheus:
+        condition: service_started
