@@ -1,4 +1,4 @@
-# Spring Boot with Open Telemetry using OTEL collector, Jaeger and Prometheus (in Docker)
+# Spring Boot with Open Telemetry using OTEL collector, Jaeger, Prometheus and Grafana (in Docker)
 
 
 ## Architecture Diagram
