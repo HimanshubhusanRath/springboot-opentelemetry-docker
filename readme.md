@@ -15,6 +15,7 @@
   * Grafana
 * Once the services are up, access the service-a:
   * `http://localhost:9094/getRemoteMessage` - Service-a's endpoint which internally connects to Service-b to get data.
+  * `http://localhost:9095/getMessage` - Service-b's endpoint to get data.
   * `http://localhost:9090` - Prometheus application to check the metrices
   * `http://localhost:16686/` - Jaeger UI to see the traces for Service-a and Service-b.
   * `http://localhost:3000` - Grafana application to see the metrics graph
